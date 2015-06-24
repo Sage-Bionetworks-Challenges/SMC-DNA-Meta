@@ -15,9 +15,10 @@ Ontario Institute for Cancer Research
 '''
 
 # ---------- LOCALS ---------- #
-columns = ('CHROM', 'POS', 'Binary.Cutoff', 'Continuous.Confidence.Score')
+columns = ('CHROM', 'POS', 'Sample', 'Binary.Cutoff', 'Continuous.Confidence.Score')
 chroms = range(1,23)
 chroms.extend(('X','Y'))
+samples = ['IS1', 'IS2', 'IS3', 'IS4']
 
 
 '''
@@ -51,6 +52,7 @@ def validate(infile):
 	print "Summarizing calls..."
 	
 	try:
+		unique_sample = None
 		positive_calls = 0
 		negative_calls = 0
 
@@ -59,6 +61,7 @@ def validate(infile):
 			# check CHROM
 			if rec_fields[0] not in str(chroms):
 				print "Invalid CHROM: " + rec_fields[0]
+				print "\tValid options: [%s]" % ', '.join(map(str,chroms))
 				sys.exit(1)
 
 			# check POS
@@ -68,9 +71,23 @@ def validate(infile):
 				print "POS not an int: " + rec_fields[1]
 				sys.exit(1)
 
+			# check sample name
+			if unique_sample == None:
+				unique_sample = rec_fields[2]
+			
+			if rec_fields[2] not in samples:
+				print "Invalid Sample: " + rec_fields[2]
+				print "\tValid options: [%s]" % ', '.join(map(str,samples))
+				sys.exit(1)
+
+			if rec_fields[2] != unique_sample:
+				print "Sample name not unique: " + rec_fields[2]
+				print "\tHave been tracking " + unique_sample
+				sys.exit(1)
+
 			# check binary cutoff
 			try:
-				binary = int(rec_fields[2])
+				binary = int(rec_fields[3])
 			except:
 				print "Binary.Cutoff not an int: " + rec_fields[2]
 				sys.exit(1)
@@ -83,7 +100,7 @@ def validate(infile):
 				print "Binary cutoff should be 0 or 1: " + rec_fields[3]
 				sys.exit(1)
 	except:
-		print "Validation Failed\n"
+		print "\nValidation Failed.\n"
 		sys.exit(1)
 	
 	print "Validation complete.\n"
