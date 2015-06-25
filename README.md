@@ -64,7 +64,8 @@ The ‘dream_vcf.py’ program will validate your submission format.
 ####Submission format
 For all submissions
 * The file must be uncompressed (not ending in .gz)
-* The file should have the following column names: CHROM, POS, Binary.Cutoff, Continuous.Confidence.Score (optional)
+* The file should include at least a one-line header, indicating the pipelines used in the model: ##Pipelines=X1000000,X2000000,X3000000
+* The file should have the following column names: CHROM, POS, Sample, Binary.Cutoff, Continuous.Confidence.Score (optional)
 * No whitespaces in fields, fields must be tab-delimited (this is also in the spec, but 
 it's a common reason for the parser to fail).
 
