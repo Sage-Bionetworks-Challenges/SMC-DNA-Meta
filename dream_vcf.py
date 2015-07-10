@@ -15,7 +15,7 @@ Ontario Institute for Cancer Research
 '''
 
 # ---------- LOCALS ---------- #
-columns = ('#CHROM', 'POS', 'Sample', 'Binary.Cutoff', 'Continuous.Confidence.Score')
+columns = ('#CHROM', 'POS', 'Sample', 'Predicted', 'Probability')
 chroms = range(1,23)
 chroms.extend(('X','Y'))
 samples = ['IS1', 'IS2', 'IS3', 'IS4']
@@ -61,8 +61,8 @@ def validate(infile):
 				sys.stderr.write("\tCheck whether you intended to have '##' instead of '#'\n")
 				sys.exit(1)
 		except:
-			if columns[i] == 'Continuous.Confidence.Score':
-				print "Optional confidence score not provided."
+			if columns[i] == 'Probability':
+				print "Optional probability not provided."
 			else:
 				sys.stderr.write("Missing column: " + columns[i] + "\n")
 				sys.exit(1)
@@ -104,11 +104,11 @@ def validate(infile):
 				sys.stderr.write("\tHave been tracking " + unique_sample + "\n")
 				sys.exit(1)
 
-			# check binary cutoff
+			# check prediction
 			try:
 				binary = int(rec_fields[3])
 			except:
-				sys.stderr.write("Binary.Cutoff not an int: " + rec_fields[2] + "\n")
+				sys.stderr.write("Predicted not an int: " + rec_fields[2] + "\n")
 				sys.exit(1)
 
 			if binary == 1:
@@ -116,7 +116,7 @@ def validate(infile):
 			elif binary == 0:
 				negative_calls += 1
 			else:
-				sys.stderr.write("Binary cutoff should be 0 or 1: " + rec_fields[3] + "\n")
+				sys.stderr.write("Prediction should be 0 or 1: " + rec_fields[3] + "\n")
 				sys.exit(1)
 	except:
 		sys.stderr.write("\nValidation Failed.\n")
