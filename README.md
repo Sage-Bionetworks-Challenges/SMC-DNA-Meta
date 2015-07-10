@@ -65,7 +65,7 @@ The ‘dream_vcf.py’ program will validate your submission format.
 For all submissions
 * The file must be uncompressed (not ending in .gz)
 * The file should include at least a one-line header, indicating the pipelines used in the model: ##Pipelines=X1000000,X2000000,X3000000
-* The file should have the following column names: CHROM, POS, Sample, Binary.Cutoff, Continuous.Confidence.Score (optional)
+* The file should have the following column names: CHROM, POS, Sample, Predicted, Probability (optional)
 * No whitespaces in fields, fields must be tab-delimited (this is also in the spec, but 
 it's a common reason for the parser to fail).
 
@@ -85,17 +85,3 @@ export SYNAPSE_EMAIL=(your email address)
 
 
 ##Upload and submit the entity to the evaluation
-
-***** UPDATE THIS *****
-
-
-
-##Viewing the results
-
-***** UPDATE THIS *****
-
-
-
-#Additional helper functions
-
-***** UPDATE THIS *****
