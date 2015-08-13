@@ -18,7 +18,7 @@ Ontario Institute for Cancer Research
 columns = ('#CHROM', 'POS', 'Sample', 'Predicted', 'Probability')
 chroms = range(1,23)
 chroms.extend(('X','Y'))
-samples = ['IS1', 'IS2', 'IS3', 'IS4']
+samples = ['IS1', 'IS2', 'IS3', 'IS4', 'CPCG0100', 'CPCG0183', 'CPCG0184', 'CPCG0196', 'CPCG0235', 'PCSI0023', 'PCSI0044', 'PCSI0046', 'PCSI0048', 'PCSI0072']
 
 
 '''
