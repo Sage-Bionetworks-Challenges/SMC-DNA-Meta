@@ -34,12 +34,12 @@ def validate(infile):
 		sys.exit(1)
 	
 	# check list of pipelines
-	pipe = re.compile('^##Pipelines=.+')
+	pipe = re.compile('^##Pipelines=\d')
 	pipelines_str = input_fh.readline()
 	if pipe.match(pipelines_str) == None:
-		sys.stderr.write("ERROR: list of pipelines not found\n")
+		sys.stderr.write("ERROR: number of pipelines used not found\n")
 		sys.stderr.write("\tFound " + pipelines_str)
-		sys.stderr.write("\tRequires ##Pipelines=XXX1,XXX2,etc.\n")
+		sys.stderr.write("\tRequires ##Pipelines={a number}\n")
 		sys.exit(1)
 	
 	# ensure pipelines in correct format
@@ -90,18 +90,9 @@ def validate(infile):
 				sys.stderr.write("POS not an int: " + rec_fields[1] + "\n")
 				sys.exit(1)
 
-			# check sample name
-			if unique_sample == None:
-				unique_sample = rec_fields[2]
-			
 			if rec_fields[2] not in samples:
 				sys.stderr.write("Invalid Sample: " + rec_fields[2] + "\n")
 				sys.stderr.write("\tValid options: [%s]\n" % ', '.join(map(str,samples)))
-				sys.exit(1)
-
-			if rec_fields[2] != unique_sample:
-				sys.stderr.write("Sample name not unique: " + rec_fields[2] + "\n")
-				sys.stderr.write("\tHave been tracking " + unique_sample + "\n")
 				sys.exit(1)
 
 			# check prediction
@@ -128,11 +119,56 @@ def validate(infile):
 	print "Positive count: ", positive_calls
 	print "Negative count: ", negative_calls
 	print "-" * 60
+
+
+'''
+Splits submitted file by sample
+'''
+def split(infile):
+	print "Starting splitting.\n"
 	
+	# try opening file before proceeding to process data
+	try:
+		input_fh = open(infile, 'r')
+	except IOError:
+		sys.stderr.write("ERROR: can't find file or read data!\n")
+		sys.exit(1)
+
+	unique_samples = [];
+	# get unique sample name
+	skip = re.compile('^#.*')
+	with open(infile, 'r') as f:
+		for line in f:
+			if not skip.match(line):	
+				unique_sample = line.split('\t')[2]
+
+				if unique_sample not in unique_samples:
+					unique_samples.append(unique_sample)
+	
+	print unique_samples
+
+	# generate output file for each sample
+	output_fhs = {}
+	for sample in unique_samples:
+		print "Generating " + sample + ".txt"
+		output_fhs[sample] = open(sample+'.txt', 'w')
+
+	with open(infile, 'r') as f:
+		for line in f:
+			if skip.match(line):
+				for sample in unique_samples:
+					output_fhs[sample].write(line)
+
+			else:
+				sample_name = line.split('\t')[2]
+				output_fhs[sample_name].write(line)
+
+	print "Split complete.\n"
+
 
 '''
 Converts output format for IGCG-TCGA DREAM SMC-Meta to simplified vcf format
-Generates new output file called sub.vcf
+Generates new output files called sample_name.vcf
 '''
 def convert(infile, truth):
 	print "Starting Conversion.\n"
@@ -144,7 +180,6 @@ def convert(infile, truth):
 	except IOError:
 		sys.stderr.write("ERROR: can't find file or read data!\n")
 		sys.exit(1)
-	output_fh = open('sub.vcf', 'w')
 
 	# get unique sample name
 	skip = re.compile('^#.*')
@@ -155,6 +190,8 @@ def convert(infile, truth):
 				continue
 			unique_sample = line.split('\t')[2]
 			break
+
+	output_fh = open(unique_sample+'.vcf', 'w')
 
 	truvcfh = vcf.Reader(filename=truth)
 	# compile list of true records, in case user's output doesn't have calls sorted in order
@@ -208,33 +245,41 @@ def convert(infile, truth):
 	input_fh.close()
 	output_fh.close()
 
-	print "Conversion complete. Converted VCF file: sub.vcf\n"
+	print "Conversion complete. Converted VCF file: " + unique_sample + ".vcf \n"
 
 
 '''
 Main file
-./dream_vcf <submitted file> [<truth file]
-
-Without truth file, performs VALIDATION
-With truth file, performs CONVERSION
+./dream_vcf validate <submitted file>
+./dream_vcf split <submitted file>
+./dream_vcf convert <submitted file> <truth file>
 '''
 if __name__ == '__main__':
-	if len(sys.argv) == 2:
-		sys.stderr.write("Usage: " + sys.argv[0] + " <submitted file> [<truth file>]\n")
-		print "No truth file given. Will only be validating submitted file...\n"
-		validate(sys.argv[1])
+	if len(sys.argv) < 2 or len(sys.argv) > 4:
+		sys.stderr.write("Usage:\n")
+		sys.stderr.write("	./dream_vcf validate <submitted file>\n")
+		sys.stderr.write("	./dream_vcf split <submitted file>\n")
+		sys.stderr.write("	./dream_vcf convert <submitted file> <truth file>\n")
+		print "Exitting...\n";
+		sys.exit(1)
+
+	elif sys.argv[1] == "validate":
+		print "Will only be validating submitted file...\n"
+		validate(sys.argv[2])
 		sys.exit(1)
 		
-	elif len(sys.argv) == 3:
-		print "Truth file given. Converting submitted file to vcf...\n"
+	elif sys.argv[1] == "split":
+		print "Will split submitted file by sample...\n"
+		split(sys.argv[2])
+		sys.exit(1)
 
+	elif sys.argv[1] == "convert":
+		print "Converting submitted file to vcf using truth file...\n"
 		if vcf is None:
 			print "Please install PyVCF"
 			print ">>> pip install PyVCF"
 			sys.exit(1)
+		convert(sys.argv[2], sys.argv[3])
 
-		convert(sys.argv[1], sys.argv[2])
 
-	else:
-		sys.stderr.write("Usage: " + sys.argv[0] + " <submitted file> [<truth file>]\n")
-		sys.exit(1)
+	print "DONE\n"
