@@ -34,7 +34,7 @@ def validate(infile):
 		sys.exit(1)
 	
 	# check list of pipelines
-	pipe = re.compile('^##Pipelines=.+')
+	pipe = re.compile('^##Pipelines=\d')
 	pipelines_str = input_fh.readline()
 	if pipe.match(pipelines_str) == None:
 		sys.stderr.write("ERROR: numbers of pipelines used not found\n")
