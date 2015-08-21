@@ -57,14 +57,14 @@ want to find out about Synapse projects.
 The ‘dream_vcf.py’ program will validate your submission format.
 
 ```
-./dream_vcf.py submitted_file 
+./dream_vcf.py validate <submitted_file>
 ```
 
 
 ####Submission format
 For all submissions
 * The file must be uncompressed (not ending in .gz)
-* The file should include at least a one-line header, indicating the pipelines used in the model: ##Pipelines=X1000000,X2000000,X3000000
+* The file should include at least a one-line header, indicating the number of pipelines used in the model: ##Pipelines=3
 * The file should have the following column names: CHROM, POS, Sample, Predicted, Probability (optional)
 * No whitespaces in fields, fields must be tab-delimited (this is also in the spec, but 
 it's a common reason for the parser to fail).
