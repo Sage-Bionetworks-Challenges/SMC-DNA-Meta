@@ -64,8 +64,27 @@ The ‘dream_vcf.py’ program will validate your submission format.
 ####Submission format
 For all submissions
 * The file must be uncompressed (not ending in .gz)
-* The file should include at least a one-line header, indicating the number of pipelines used in the model: ##Pipelines=3
-* The file should have the following column names: CHROM, POS, Sample, Predicted, Probability (optional)
+* The file should include at least a one-line header, indicating the number of pipelines used in the model, PLUS a list of pipelines used for each sample:
+```
+  ##NumPipelines=3
+  ##IS1Pipelines=X1,X2,X3
+  ##IS2Pipelines=X1,X4,X5
+```
+where IS1 is the sample, and NumPipelines indicate the length of the list of pipelines associated with each sample
+
+* The file should have the following column names: CHROM, POS, Sample, Predicted, Probability (optional),
+```
+  #CHROM  POS Sample  Predicted Probability
+```
+  followed by the calls, specified in order by chromosome, position, and sample:
+```
+  1 12345 IS1 1 0.50
+  1 15000 IS1 0 0.75
+  2 1234  IS1 1 0.99
+  ...
+  1 123   IS2 1 0.95
+```
+
 * No whitespaces in fields, fields must be tab-delimited (this is also in the spec, but 
 it's a common reason for the parser to fail).
 
