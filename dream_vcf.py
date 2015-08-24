@@ -33,26 +33,58 @@ def validate(infile):
 		sys.stderr.write("ERROR: can't find file or read data from: " + infile + "\n")
 		sys.exit(1)
 	
-	# check list of pipelines
-	pipe = re.compile('^##Pipelines=\d')
-	pipelines_str = input_fh.readline()
-	if pipe.match(pipelines_str) == None:
+	unique_samples = [];
+	# get unique sample names
+	skip = re.compile('^#.*')
+	with open(infile, 'r') as f:
+		for line in f:
+			if not skip.match(line):	
+				unique_sample = line.split('\t')[2]
+
+				if unique_sample not in samples:
+					sys.stderr.write("Invalid Sample: " + unique_sample + "\n")
+					sys.stderr.write("\tValid options: [%s]\n" % ', '.join(map(str,samples)))
+					sys.exit(1)
+				if unique_sample not in unique_samples:
+					unique_samples.append(unique_sample)
+
+	# check number of pipelines
+	pipelines_num_re = re.compile('^##NumPipelines=\d')
+	pipelines_num = input_fh.readline()
+	if pipelines_num_re.match(pipelines_num) == None:
 		sys.stderr.write("ERROR: numbers of pipelines used not found\n")
-		sys.stderr.write("\tFound " + pipelines_str)
-		sys.stderr.write("\tRequires ##Pipelines={a number}\n")
+		sys.stderr.write("\tFound " + pipelines_num)
+		sys.stderr.write("\tRequires ##NumPipelines={a number}\n")
 		sys.exit(1)
-	
-	# ensure pipelines in correct format
-	pipelines = (pipelines_str.split('=')[1]).split(',')
+	num_pipelines = int(pipelines_num.split('=')[1])
+
+	# check pipelines used for each unique sample
+	for sample in unique_samples:
+		sample_pipelines_re = re.compile('^##'+sample+'Pipelines=.*')
+		sample_pipelines = input_fh.readline()
+		if sample_pipelines_re.match(sample_pipelines) == None:
+			sys.stderr.write("ERROR: invalid line corresponding to sample pipelines\n")
+			sys.stderr.write("\tFound " + sample_pipelines)
+			sys.stderr.write("\tRequires ##" +sample+ "Pipelines={list of pipelines}\n")
+			sys.exit(1)
+
+		# validate correct number of specified pipelines
+		pipelines_str = sample_pipelines.split('=')[1]
+		pipelines_list = pipelines_str.split(',')
+		if len(pipelines_list) != num_pipelines:
+			sys.stderr.write("ERROR: expecting " +str(num_pipelines)+ " pipelines, but seen " +str(len(pipelines_list))+ " for sample " +sample+ "\n")
+			sys.exit(1)
+
 
 	skip = re.compile('^##')
 	while(1):
-		sub_columns = input_fh.readline()
-		if skip.match(sub_columns):
+		line = input_fh.readline()
+		if skip.match(line):
 			continue
 		break
 	
-	fields = sub_columns.split('\t')
+	# should be at columns 
+	fields = line.split('\t')
 	for i in range(len(columns)):
 		try:
 			if fields[i].strip() != columns[i]:
@@ -88,11 +120,6 @@ def validate(infile):
 				pos = int(rec_fields[1])
 			except:
 				sys.stderr.write("POS not an int: " + rec_fields[1] + "\n")
-				sys.exit(1)
-
-			if rec_fields[2] not in samples:
-				sys.stderr.write("Invalid Sample: " + rec_fields[2] + "\n")
-				sys.stderr.write("\tValid options: [%s]\n" % ', '.join(map(str,samples)))
 				sys.exit(1)
 
 			# check prediction
@@ -144,8 +171,8 @@ def split(infile):
 
 				if unique_sample not in unique_samples:
 					unique_samples.append(unique_sample)
-	
-	print unique_samples
+		
+	print "Unique samples: ", unique_samples
 
 	# generate output file for each sample
 	output_fhs = {}
@@ -201,23 +228,24 @@ def convert(infile, truth):
 	vcf_sample = "##SAMPLE=<ID=" + unique_sample + ">\n"
 	vcf_fields = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
 
-	# get pipelines used
-	pipelines_str = input_fh.readline()
-	while(1):
-		sub_columns = input_fh.readline()
-		if skip.match(sub_columns):
-			next
-		break
-	
 	# writing meta data
 	output_fh.write(vcf_header)
 	output_fh.write(vcf_sample)
-	output_fh.write(pipelines_str)
+
+	# meta data associated with pipelines 
+	pipelines = re.compile('^##.*')
+	for line in input_fh:
+		if pipelines.match(line):
+			output_fh.write(line)
+		else:
+			break
 	output_fh.write(vcf_fields)
 
-	# evaluating each call
-	sub_columns = input_fh.readline()
 	for line in input_fh:
+		if skip.match(line):
+			continue
+
+		# evaluating each call
 		fields = line.split('\t')
 		chrom = fields[0]
 		chrom = chrom.replace("chr","")
@@ -266,12 +294,10 @@ if __name__ == '__main__':
 	elif sys.argv[1] == "validate":
 		print "Will only be validating submitted file...\n"
 		validate(sys.argv[2])
-		sys.exit(1)
 		
 	elif sys.argv[1] == "split":
 		print "Will split submitted file by sample...\n"
 		split(sys.argv[2])
-		sys.exit(1)
 
 	elif sys.argv[1] == "convert":
 		print "Converting submitted file to vcf using truth file...\n"
