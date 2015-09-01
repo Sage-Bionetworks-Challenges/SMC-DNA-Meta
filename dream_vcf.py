@@ -18,11 +18,13 @@ Ontario Institute for Cancer Research
 columns = ('#CHROM', 'POS', 'Sample', 'Predicted', 'Probability')
 chroms = range(1,23)
 chroms.extend(('X','Y'))
-samples = ['IS1', 'IS2', 'IS3', 'IS4', 'CPCG0100', 'CPCG0183', 'CPCG0184', 'CPCG0196', 'CPCG0235', 'PCSI0023', 'PCSI0044', 'PCSI0046', 'PCSI0048', 'PCSI0072']
+samples = ['synthetic_1', 'synthetic_2', 'synthetic_3', 'synthetic_4', 'CPCG0100', 'CPCG0183', 'CPCG0184', 'CPCG0196', 'CPCG0235', 'PCSI0023', 'PCSI0044', 'PCSI0046', 'PCSI0048', 'PCSI0072']
 
 
 '''
-Validates submission file by ensuring proper column names and values.
+Validates submission file by
+- ensuring proper column names and values.
+- ensure ALL tumour samples are included in submission
 '''
 def validate(infile):
 	print "Starting Validation.\n"
@@ -47,34 +49,35 @@ def validate(infile):
 					sys.exit(1)
 				if unique_sample not in unique_samples:
 					unique_samples.append(unique_sample)
-
-	# check number of pipelines
-	pipelines_num_re = re.compile('^##NumPipelines=\d')
-	pipelines_num = input_fh.readline()
-	if pipelines_num_re.match(pipelines_num) == None:
-		sys.stderr.write("ERROR: numbers of pipelines used not found\n")
-		sys.stderr.write("\tFound " + pipelines_num)
-		sys.stderr.write("\tRequires ##NumPipelines={a number}\n")
+	
+	if len(samples) != len(unique_samples):
+		sys.stderr.write("Not all tumour samples provided\n")
+		sys.stderr.write("Missing tumour samples: [%s]\n" % ', '.join(list(set(samples) - set(unique_samples))))
 		sys.exit(1)
-	num_pipelines = int(pipelines_num.split('=')[1])
+
+
+	# init num_pipelines to -1
+	num_pipelines = -1
 
 	# check pipelines used for each unique sample
 	for sample in unique_samples:
-		sample_pipelines_re = re.compile('^##'+sample+'Pipelines=.*')
+		sample_pipelines_re = re.compile('^##'+sample+'_Pipelines=.*')
 		sample_pipelines = input_fh.readline()
 		if sample_pipelines_re.match(sample_pipelines) == None:
 			sys.stderr.write("ERROR: invalid line corresponding to sample pipelines\n")
 			sys.stderr.write("\tFound " + sample_pipelines)
-			sys.stderr.write("\tRequires ##" +sample+ "Pipelines={list of pipelines}\n")
+			sys.stderr.write("\tRequires ##" +sample+ "_Pipelines={list of pipelines}\n")
 			sys.exit(1)
 
 		# validate correct number of specified pipelines
 		pipelines_str = sample_pipelines.split('=')[1]
 		pipelines_list = pipelines_str.split(',')
-		if len(pipelines_list) != num_pipelines:
-			sys.stderr.write("ERROR: expecting " +str(num_pipelines)+ " pipelines, but seen " +str(len(pipelines_list))+ " for sample " +sample+ "\n")
-			sys.exit(1)
-
+		if (num_pipelines == -1):
+			num_pipelines = len(pipelines_list)
+		else:
+			if len(pipelines_list) != num_pipelines:
+				sys.stderr.write("ERROR: expecting " +str(num_pipelines)+ " pipelines, but seen " +str(len(pipelines_list))+ " for sample " +sample+ "\n")
+				sys.exit(1)
 
 	skip = re.compile('^##')
 	while(1):
@@ -161,31 +164,25 @@ def split(infile):
 		sys.stderr.write("ERROR: can't find file or read data!\n")
 		sys.exit(1)
 
-	unique_samples = [];
-	# get unique sample name
-	skip = re.compile('^#.*')
-	with open(infile, 'r') as f:
-		for line in f:
-			if not skip.match(line):	
-				unique_sample = line.split('\t')[2]
-
-				if unique_sample not in unique_samples:
-					unique_samples.append(unique_sample)
-		
-	print "Unique samples: ", unique_samples
+	pipelines = re.compile('^##.*_Pipelines=.*')
+	header = re.compile('^#[^#].*')
 
 	# generate output file for each sample
 	output_fhs = {}
-	for sample in unique_samples:
+	for sample in samples:
 		print "Generating " + sample + ".txt"
 		output_fhs[sample] = open(sample+'.txt', 'w')
 
 	with open(infile, 'r') as f:
 		for line in f:
-			if skip.match(line):
-				for sample in unique_samples:
+			if header.match(line):
+				for sample in samples:
 					output_fhs[sample].write(line)
-
+			elif pipelines.match(line):
+				# get sample name associated with pipeline string
+				temp = line.split('_Pipelines')[0]
+				sample_name = temp.split('##')[1]
+				output_fhs[sample_name].write(line)
 			else:
 				sample_name = line.split('\t')[2]
 				output_fhs[sample_name].write(line)
