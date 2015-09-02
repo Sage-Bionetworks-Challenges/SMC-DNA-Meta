@@ -2,6 +2,7 @@
 
 import sys, os
 import re
+import tempfile
 
 try:
 	import vcf
@@ -31,124 +32,106 @@ def validate(infile):
 
 	try:
 		input_fh = open(infile, 'r')
-	except IOError:
-		sys.stderr.write("ERROR: can't find file or read data from: " + infile + "\n")
-		sys.exit(1)
+	except IOError, e:
+		raise IOError(e)
 	
 	unique_samples = [];
 	# get unique sample names
 	skip = re.compile('^#.*')
-	with open(infile, 'r') as f:
-		for line in f:
-			if not skip.match(line):	
-				unique_sample = line.split('\t')[2]
+	try:
+		with open(infile, 'r') as f:
+			for line in f:
+				if not skip.match(line):	
+					unique_sample = line.split('\t')[2]
 
-				if unique_sample not in samples:
-					sys.stderr.write("Invalid Sample: " + unique_sample + "\n")
-					sys.stderr.write("\tValid options: [%s]\n" % ', '.join(map(str,samples)))
-					sys.exit(1)
-				if unique_sample not in unique_samples:
-					unique_samples.append(unique_sample)
-	
-	if len(samples) != len(unique_samples):
-		sys.stderr.write("Not all tumour samples provided\n")
-		sys.stderr.write("Missing tumour samples: [%s]\n" % ', '.join(list(set(samples) - set(unique_samples))))
-		sys.exit(1)
+					assert unique_sample in samples, "\nInvalid sample: " +unique_sample+ "\n"
+					if unique_sample not in unique_samples:
+						unique_samples.append(unique_sample)
 
+		assert len(samples) == len(unique_samples), "\nMissing tumour samples: [%s]\n" % ', '.join(list(set(samples) - set(unique_samples)))
+
+	except Exception, e:
+		print "Valid samples: [%s]\n" % ', '.join(map(str,samples))
+		raise Exception(e)
+		
 
 	# init num_pipelines to -1
 	num_pipelines = -1
 
-	# check pipelines used for each unique sample
-	for sample in unique_samples:
-		sample_pipelines_re = re.compile('^##'+sample+'_Pipelines=.*')
-		sample_pipelines = input_fh.readline()
-		if sample_pipelines_re.match(sample_pipelines) == None:
-			sys.stderr.write("ERROR: invalid line corresponding to sample pipelines\n")
-			sys.stderr.write("\tFound " + sample_pipelines)
-			sys.stderr.write("\tRequires ##" +sample+ "_Pipelines={list of pipelines}\n")
-			sys.exit(1)
-
-		# validate correct number of specified pipelines
-		pipelines_str = sample_pipelines.split('=')[1]
-		pipelines_list = pipelines_str.split(',')
-		if (num_pipelines == -1):
-			num_pipelines = len(pipelines_list)
-		else:
-			if len(pipelines_list) != num_pipelines:
-				sys.stderr.write("ERROR: expecting " +str(num_pipelines)+ " pipelines, but seen " +str(len(pipelines_list))+ " for sample " +sample+ "\n")
-				sys.exit(1)
-
+	try:
+		# check pipelines used for each unique sample
+		for sample in unique_samples:
+			sample_pipelines_re = re.compile('^##'+sample+'_Pipelines=.*')
+			sample_pipelines = input_fh.readline()
+			if sample_pipelines_re.match(sample_pipelines) is None:
+				raise Exception("\nFound " +sample_pipelines+ "\nRequires ##" +sample+ "_Pipelines={list of pipelines}\n")
+	
+			# validate correct number of specified pipelines
+			pipelines_str = sample_pipelines.split('=')[1]
+			pipelines_list = pipelines_str.split(',')
+			if (num_pipelines == -1):
+				num_pipelines = len(pipelines_list)
+			else:
+				assert len(pipelines_list) == num_pipelines, "\nExpecting " +str(num_pipelines)+ " pipelines, but seen " +str(len(pipelines_list))+ " for sample " +sample
+	except Exception, e:
+		raise Exception(e)
+	
 	skip = re.compile('^##')
 	while(1):
 		line = input_fh.readline()
 		if skip.match(line):
 			continue
 		break
-	
+
 	# should be at columns 
 	fields = line.split('\t')
 	for i in range(len(columns)):
 		try:
 			if fields[i].strip() != columns[i]:
-				sys.stderr.write("Invalid column name: " + fields[i] + "\n")
-				sys.stderr.write("Should be: " + columns[i] + "\n")
-				sys.stderr.write("\tCheck whether you intended to have '##' instead of '#'\n")
-				sys.exit(1)
-		except:
+				raise Exception("\nInvalid column name: " +fields[i]+ "\nShould be: " +columns[i])
+		except Exception, e:
 			if columns[i] == 'Probability':
 				print "Optional probability not provided."
 			else:
-				sys.stderr.write("Missing column: " + columns[i] + "\n")
-				sys.exit(1)
+				raise Exception("\nMissing column: " +columns[i])
 	
 	print "Submitted file has proper column names.\n"
 	print "Summarizing calls..."
 
 	try:
-		unique_sample = None
-		positive_calls = 0
-		negative_calls = 0
+		positive_calls = {}
+		negative_calls = {}
 
 		for rec in input_fh:
 			rec_fields = rec.split('\t')
 			# check CHROM
-			if rec_fields[0] not in str(chroms):
-				sys.stderr.write("Invalid CHROM: " + rec_fields[0] + "\n")
-				sys.stderr.write("\tValid options: [%s]\n" % ', '.join(map(str,chroms)))
-				sys.exit(1)
-
+			assert rec_fields[0] in str(chroms), "\nInvalid CHROM: " +rec_fields[0]+ "\nValid options: [%s]\n" % ', '.join(map(str,chroms))
 			# check POS
-			try:
-				pos = int(rec_fields[1])
-			except:
-				sys.stderr.write("POS not an int: " + rec_fields[1] + "\n")
-				sys.exit(1)
-
+			pos = int(rec_fields[1])
+			# get sample
+			sample = rec_fields[2]
 			# check prediction
-			try:
-				binary = int(rec_fields[3])
-			except:
-				sys.stderr.write("Predicted not an int: " + rec_fields[2] + "\n")
-				sys.exit(1)
+			binary = int(rec_fields[3])
 
-			if binary == 1:
-				positive_calls += 1
-			elif binary == 0:
-				negative_calls += 1
-			else:
-				sys.stderr.write("Prediction should be 0 or 1: " + rec_fields[3] + "\n")
-				sys.exit(1)
-	except:
-		sys.stderr.write("\nValidation Failed.\n")
-		sys.exit(1)
-	
+			assert binary == 1 or binary == 0, "\nPrediction should be 0 or 1: " +rec_fields[3]
+
+			try:
+				positive_calls[sample] += binary
+				negative_calls[sample] += (1-binary)
+			except KeyError:
+				positive_calls[sample] = binary
+				negative_calls[sample] = 1 - binary
+	except Exception, e:
+		raise Exception(e)
+
+	for sample in samples:
+		print "Total " +sample+ " records: ", positive_calls[sample]+negative_calls[sample]
+		print "-" * 60
+		print "Positive count: ", positive_calls[sample]
+		print "Negative count: ", negative_calls[sample]
+		print "-" * 60
+
 	print "Validation complete.\n"
-	print "Total records: ", positive_calls+negative_calls
-	print "-" * 60
-	print "Positive count: ", positive_calls
-	print "Negative count: ", negative_calls
-	print "-" * 60
 
 
 '''
@@ -160,9 +143,8 @@ def split(infile):
 	# try opening file before proceeding to process data
 	try:
 		input_fh = open(infile, 'r')
-	except IOError:
-		sys.stderr.write("ERROR: can't find file or read data!\n")
-		sys.exit(1)
+	except IOError, e:
+		raise IOError(e)
 
 	pipelines = re.compile('^##.*_Pipelines=.*')
 	header = re.compile('^#[^#].*')
@@ -170,8 +152,7 @@ def split(infile):
 	# generate output file for each sample
 	output_fhs = {}
 	for sample in samples:
-		print "Generating " + sample + ".txt"
-		output_fhs[sample] = open(sample+'.txt', 'w')
+		output_fhs[sample] = tempfile.NamedTemporaryFile()
 
 	with open(infile, 'r') as f:
 		for line in f:
@@ -187,7 +168,9 @@ def split(infile):
 				sample_name = line.split('\t')[2]
 				output_fhs[sample_name].write(line)
 
+	input_fh.close()
 	print "Split complete.\n"
+	return output_fhs
 
 
 '''
@@ -198,24 +181,16 @@ def convert(infile, truth):
 	print "Starting Conversion.\n"
 	assert truth.endswith('.vcf') or truth.endswith('.vcf.gz')
 
-	# try opening file before proceeding to process data
-	try:
-		input_fh = open(infile, 'r')
-	except IOError:
-		sys.stderr.write("ERROR: can't find file or read data!\n")
-		sys.exit(1)
-
+	infile.seek(0)
 	# get unique sample name
 	skip = re.compile('^#.*')
-	with open(infile, 'r') as f:
-		while(1):
-			line = f.readline()
-			if skip.match(line):
-				continue
-			unique_sample = line.split('\t')[2]
-			break
+	for line in infile:
+		if skip.match(line):
+			continue
+		unique_sample = line.split('\t')[2]
+		break
 
-	output_fh = open(unique_sample+'.vcf', 'w')
+	output_fh = tempfile.NamedTemporaryFile()
 
 	truvcfh = vcf.Reader(filename=truth)
 	# compile list of true records, in case user's output doesn't have calls sorted in order
@@ -231,14 +206,15 @@ def convert(infile, truth):
 
 	# meta data associated with pipelines 
 	pipelines = re.compile('^##.*')
-	for line in input_fh:
+	infile.seek(0)
+	for line in infile:
 		if pipelines.match(line):
 			output_fh.write(line)
 		else:
 			break
 	output_fh.write(vcf_fields)
 
-	for line in input_fh:
+	for line in infile:
 		if skip.match(line):
 			continue
 
@@ -267,42 +243,42 @@ def convert(infile, truth):
 			output_fh.write("\t".join( (chrom,pos,".",ref,alt,".","PASS","SOMATIC") ) )
 			output_fh.write("\n")
 
-	input_fh.close()
-	output_fh.close()
+	infile.close()
+	print "Conversion complete for " + unique_sample + ".\n"
+	return output_fh
 
-	print "Conversion complete. Converted VCF file: " + unique_sample + ".vcf \n"
+
+'''
+Preprocesses submitted file into 14 different VCFs, one for each tumour sample
+- splits submission by sample
+- converts each sample calls into vcf format
+'''
+def preprocess(infile, evaluation_confs):
+	out_split = split(infile)
+	output_list = list()
+
+	for sample in samples:
+		vcf = convert(out_split[sample], evaluation_confs[sample])
+		output_list.append((vcf, sample))
+#		output_list.append((vcf.name, sample))
+
+	print "Preprocessing complete.\n"
+	return output_list
 
 
 '''
 Main file
-./dream_vcf validate <submitted file>
-./dream_vcf split <submitted file>
-./dream_vcf convert <submitted file> <truth file>
+./dream_vcf.py validate <submitted file>
 '''
 if __name__ == '__main__':
-	if len(sys.argv) < 2 or len(sys.argv) > 4:
+	if len(sys.argv) != 3 or sys.argv[1] != "validate":
 		sys.stderr.write("Usage:\n")
-		sys.stderr.write("	./dream_vcf validate <submitted file>\n")
-		sys.stderr.write("	./dream_vcf split <submitted file>\n")
-		sys.stderr.write("	./dream_vcf convert <submitted file> <truth file>\n")
+		sys.stderr.write("	./dream_vcf.py validate <submitted file>\n")
 		print "Exitting...\n";
 		sys.exit(1)
 
-	elif sys.argv[1] == "validate":
+	else:
 		print "Will only be validating submitted file...\n"
 		validate(sys.argv[2])
-		
-	elif sys.argv[1] == "split":
-		print "Will split submitted file by sample...\n"
-		split(sys.argv[2])
-
-	elif sys.argv[1] == "convert":
-		print "Converting submitted file to vcf using truth file...\n"
-		if vcf is None:
-			print "Please install PyVCF"
-			print ">>> pip install PyVCF"
-			sys.exit(1)
-		convert(sys.argv[2], sys.argv[3])
-
-
+	
 	print "DONE\n"
