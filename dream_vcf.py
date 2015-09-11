@@ -21,11 +21,6 @@ chroms = range(1,23)
 chroms.extend(('X','Y'))
 samples = ['synthetic_1', 'synthetic_2', 'synthetic_3', 'synthetic_4', 'CPCG0100', 'CPCG0183', 'CPCG0184', 'CPCG0196', 'CPCG0235', 'PCSI0023', 'PCSI0044', 'PCSI0046', 'PCSI0048', 'PCSI0072']
 
-sub = 'submitted'
-confs = {}
-for sample in samples:
-	confs[sample] = 'synthetic.challenge.set4.tumour.25pctmasked.truth.vcf.gz'
-
 
 '''
 Validates submission file by
@@ -202,15 +197,15 @@ def convert(infile, truth):
 		truvcfh = vcf.Reader(filename=truth)
 		# compile list of true records, in case user's output doesn't have calls sorted in order
 		trulist = [trurec for trurec in truvcfh]
-	
+
 		vcf_header = "##fileformat=VCFv4.1\n"
 		vcf_sample = "##SAMPLE=<ID=" + unique_sample + ">\n"
 		vcf_fields = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
-	
+
 		# writing meta data
 		output_fh.write(vcf_header)
 		output_fh.write(vcf_sample)
-	
+
 		# meta data associated with pipelines 
 		pipelines = re.compile('^##.*')
 		infile.seek(0)
@@ -220,18 +215,18 @@ def convert(infile, truth):
 			else:
 				break
 		output_fh.write(vcf_fields)
-	
+
 		for line in infile:
 			if skip.match(line):
 				continue
-	
+
 			# evaluating each call
 			fields = line.split('\t')
 			chrom = fields[0]
 			chrom = chrom.replace("chr","")
 			pos = fields[1]
 			binary = fields[3]
-	
+
 			if int(binary):
 				'''
 				Fixing REF and ALT fields:
@@ -246,7 +241,7 @@ def convert(infile, truth):
 						ref = str(trurec.REF)
 						alt = str(trurec.ALT[0])
 						break
-	
+
 				output_fh.write("\t".join( (chrom,pos,".",ref,alt,".","PASS","SOMATIC") ) )
 				output_fh.write("\n")
 
@@ -267,7 +262,6 @@ def preprocess(infile, evaluation_confs):
 	for sample in samples:
 		vcf = convert(out_split[sample], evaluation_confs[sample])
 		output_list.append((vcf, sample))
-#		output_list.append((vcf.name, sample))
 
 	print "Preprocessing complete.\n"
 	return output_list
