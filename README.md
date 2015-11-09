@@ -124,3 +124,14 @@ export SYNAPSE_EMAIL=(your email address)
 
 
 ##Upload and submit the entity to the evaluation
+```
+./dream_submit meta-snv --submission my_sub.txt --name "Name of Submission" --team-name "Team Name" --project-id syn12345
+OR
+./dream_submit meta-snv --entity syn12345 --name "Name of Submission" --team-name "Team Name"
+```
+
+Using the first method will generate a directory structure under https://www.synapse.org/#!Synapse:syn12345/files/:
+META
+  |
+  meta-snv
+    | my_sub.txt
