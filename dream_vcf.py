@@ -19,7 +19,8 @@ Ontario Institute for Cancer Research
 columns = ('#CHROM', 'POS', 'Sample', 'Predicted', 'Probability')
 chroms = range(1,23)
 chroms.extend(('X','Y'))
-samples = ['synthetic_1', 'synthetic_2', 'synthetic_3', 'synthetic_4', 'CPCG0100', 'CPCG0183', 'CPCG0184', 'CPCG0196', 'CPCG0235', 'PCSI0023', 'PCSI0044', 'PCSI0046', 'PCSI0048', 'PCSI0072']
+all_samples = ['synthetic_1', 'synthetic_2', 'synthetic_3', 'synthetic_4', 'CPCG0100', 'CPCG0183', 'CPCG0184', 'CPCG0196', 'CPCG0235', 'PCSI0023', 'PCSI0044', 'PCSI0046', 'PCSI0048', 'PCSI0072']
+score_samples = ['synthetic_1', 'synthetic_2', 'synthetic_3', 'synthetic_4']
 
 
 '''
@@ -44,14 +45,14 @@ def validate(infile):
 				if not skip.match(line):	
 					unique_sample = line.split('\t')[2]
 
-					assert unique_sample in samples, "\nInvalid sample: " +unique_sample+ "\n"
+					assert unique_sample in all_samples, "\nInvalid sample: " +unique_sample+ "\n"
 					if unique_sample not in unique_samples:
 						unique_samples.append(unique_sample)
 
-		assert len(samples) == len(unique_samples), "\nMissing tumour samples: [%s]\n" % ', '.join(list(set(samples) - set(unique_samples)))
+		assert len(all_samples) == len(unique_samples), "\nMissing tumour samples: [%s]\n" % ', '.join(list(set(all_samples) - set(unique_samples)))
 
 	except Exception, e:
-		print "Valid samples: [%s]\n" % ', '.join(map(str,samples))
+		print "Valid samples: [%s]\n" % ', '.join(map(str,all_samples))
 		raise Exception(e)
 		
 
@@ -124,7 +125,7 @@ def validate(infile):
 	except Exception, e:
 		raise Exception(e)
 
-	for sample in samples:
+	for sample in all_samples:
 		print "Total " +sample+ " records: ", positive_calls[sample]+negative_calls[sample]
 		print "-" * 60
 		print "Positive count: ", positive_calls[sample]
@@ -132,6 +133,7 @@ def validate(infile):
 		print "-" * 60
 
 	print "Validation complete.\n"
+	return num_pipelines
 
 
 '''
@@ -151,13 +153,13 @@ def split(infile):
 
 	# generate output file for each sample
 	output_fhs = {}
-	for sample in samples:
+	for sample in all_samples:
 		output_fhs[sample] = tempfile.NamedTemporaryFile()
 
 	with open(infile, 'r') as f:
 		for line in f:
 			if header.match(line):
-				for sample in samples:
+				for sample in all_samples:
 					output_fhs[sample].write(line)
 			elif pipelines.match(line):
 				# get sample name associated with pipeline string
@@ -259,7 +261,7 @@ def preprocess(infile, evaluation_confs):
 	out_split = split(infile)
 	output_list = list()
 
-	for sample in samples:
+	for sample in score_samples:
 		vcf = convert(out_split[sample], evaluation_confs[sample])
 		output_list.append((vcf, sample))
 
@@ -280,6 +282,6 @@ if __name__ == '__main__':
 
 	else:
 		print "Will only be validating submitted file...\n"
-		validate(sys.argv[2])
+		num_pipelines = validate(sys.argv[2])
 	
 	print "DONE\n"
